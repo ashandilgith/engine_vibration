@@ -1,0 +1,26 @@
+{
+	"name": "Predictive Maintenance MVP",
+	// Use a standard Python 3.10 image
+	"image": "mcr.microsoft.com/devcontainers/python:3.10-bullseye",
+
+	"customizations": {
+		"vscode": {
+			// Add extensions that should be installed automatically
+			"extensions": [
+				"ms-python.python",
+				"ms-python.vscode-pylance",
+				"ms-toolsai.jupyter",
+				"vsciot-vscode.vscode-arduino"
+			]
+		}
+	},
+
+	// Forward ports for our web server and notebook
+	"forwardPorts": [5000, 8888],
+
+	// Run a command after the container is created
+	"postCreateCommand": "pip install --user -r requirements.txt",
+
+	// Use the non-root user
+	"remoteUser": "vscode"
+}
