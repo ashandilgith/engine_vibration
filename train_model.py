@@ -20,11 +20,14 @@ def main():
     """Main function to run the EDA, preprocessing, and training pipeline."""
     # --- 1. Load and Explore Data ---
     print("--- Starting EDA and Cleaning ---")
-    if not os.path.exists('raw_data.csv'):
-        print("Error: raw_data.csv not found. Please generate it first by running generate_practice_data.py")
+    
+    data_path = os.path.join('data', 'raw_data.csv')
+
+    if not os.path.exists(data_path):
+        print(f"Error: {data_path} not found. Please generate it first by running generate_practice_data.py")
         return
 
-    df = pd.read_csv('raw_data.csv')
+    df = pd.read_csv(data_path)
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     df.set_index('timestamp', inplace=True)
 
@@ -46,12 +49,10 @@ def main():
     # --- 3. Model Training ---
     print("\n--- Training Time-Series Anomaly Detection Model ---")
     
-    # We will train the model only on the 'healthy' part of the data
     healthy_cutoff = int(len(df_smooth) * 0.6)
     df_healthy = df_smooth.iloc[:healthy_cutoff]
 
     scaler = StandardScaler()
-    # Focus on z-axis vibration for anomaly detection
     scaled_data = scaler.fit_transform(df_healthy[['az']])
 
     WINDOW_SIZE = 50
@@ -74,17 +75,17 @@ def main():
     
     # --- 4. Save Model and Threshold ---
     os.makedirs('models', exist_ok=True)
-    model.save('models/time_series_model.h5')
+    # FIX: Save in the recommended .keras format
+    model.save('models/time_series_model.keras') 
 
     # Calculate anomaly threshold on the same healthy data
     train_pred = model.predict(X_train)
     train_mae_loss = np.mean(np.abs(train_pred - y_train), axis=1)
-    # Set a robust threshold
     anomaly_threshold = np.max(train_mae_loss) * 1.5 
     np.save('models/anomaly_threshold.npy', anomaly_threshold)
     
     print(f"\nTraining complete.")
-    print(f"Model saved to: models/time_series_model.h5")
+    print(f"Model saved to: models/time_series_model.keras")
     print(f"Anomaly threshold ({anomaly_threshold:.4f}) saved to: models/anomaly_threshold.npy")
 
 if __name__ == "__main__":

@@ -5,11 +5,17 @@ import os
 from datetime import datetime
 
 app = Flask(__name__)
-CSV_FILE = 'raw_data.csv'
+
+# Define the data directory and the full path for the CSV file
+DATA_DIR = 'data'
+CSV_FILE = os.path.join(DATA_DIR, 'raw_data.csv')
 
 @app.route('/data', methods=['POST'])
 def receive_data():
     try:
+        # Ensure the data directory exists
+        os.makedirs(DATA_DIR, exist_ok=True)
+        
         data = request.get_json()
         log_data = {
             'timestamp': [datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
@@ -18,6 +24,7 @@ def receive_data():
             'temperature_c': [data.get('temperature_c')]
         }
         df_new = pd.DataFrame(log_data)
+        
         if not os.path.exists(CSV_FILE):
             df_new.to_csv(CSV_FILE, index=False, header=True)
         else:
@@ -28,4 +35,3 @@ def receive_data():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-

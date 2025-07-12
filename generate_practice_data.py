@@ -2,8 +2,17 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+import os
 
 def generate_data(filename="raw_data.csv", total_rows=5000):
+    """
+    Generates a synthetic dataset simulating a machine's lifecycle.
+    """
+    # Define the data directory and create it if it doesn't exist
+    data_dir = 'data'
+    os.makedirs(data_dir, exist_ok=True)
+    filepath = os.path.join(data_dir, filename)
+
     print(f"Generating synthetic dataset with {total_rows} rows...")
     start_time = datetime.now() - timedelta(hours=10)
     timestamps = [start_time + timedelta(seconds=i*2) for i in range(total_rows)]
@@ -21,8 +30,10 @@ def generate_data(filename="raw_data.csv", total_rows=5000):
     az[fault_start_index:] += np.random.normal(0, 0.2 * fault_trend, fault_duration)
     temp[fault_start_index:] += fault_trend * 30
     df = pd.DataFrame({'timestamp': timestamps, 'ax': ax, 'ay': ay, 'az': az, 'gx': gx, 'gy': gy, 'gz': gz, 'temperature_c': temp})
-    df.to_csv(filename, index=False)
-    print(f"Successfully generated and saved data to '{filename}'")
+    
+    # Save to the correct filepath inside the data directory
+    df.to_csv(filepath, index=False)
+    print(f"Successfully generated and saved data to '{filepath}'")
 
 if __name__ == "__main__":
     generate_data()
