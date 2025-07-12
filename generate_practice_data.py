@@ -4,9 +4,6 @@ import numpy as np
 from datetime import datetime, timedelta
 
 def generate_data(filename="raw_data.csv", total_rows=5000):
-    """
-    Generates a synthetic dataset simulating a machine's lifecycle.
-    """
     print(f"Generating synthetic dataset with {total_rows} rows...")
     start_time = datetime.now() - timedelta(hours=10)
     timestamps = [start_time + timedelta(seconds=i*2) for i in range(total_rows)]
