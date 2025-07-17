@@ -1,5 +1,5 @@
-tensorflow
 pandas
+numpy
 scikit-learn
 gradio
-matplotlib
+xgboost

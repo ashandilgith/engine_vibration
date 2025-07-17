@@ -1,82 +1,85 @@
-# --- app.py ---
-import gradio as gr, numpy as np, pandas as pd, io, os
-from tensorflow.keras.models import load_model
-from sklearn.preprocessing import StandardScaler
+# --- app.py (Regression Version) ---
+import gradio as gr
+import numpy as np
+import pandas as pd
+import os
+import xgboost as xgb
 
-# Build absolute paths to the model files to ensure they are found
+# --- Load Model and Threshold ---
 base_dir = os.path.dirname(os.path.abspath(__file__))
-model_path = os.path.join(base_dir, 'models', 'time_series_model.keras')
-threshold_path = os.path.join(base_dir, 'models', 'anomaly_threshold.npy')
+model_path = os.path.join(base_dir, 'models', 'vibration_regressor.json')
+threshold_path = os.path.join(base_dir, 'models', 'regression_anomaly_threshold.npy')
 
-# Load model and threshold with error checking
 try:
-    if not os.path.exists(model_path) or not os.path.exists(threshold_path):
-        raise FileNotFoundError("Model or threshold file not found. Please run 'train_model.py' first.")
-    model = load_model(model_path)
+    model = xgb.XGBRegressor()
+    model.load_model(model_path)
     anomaly_threshold = np.load(threshold_path)
     print("Model and threshold loaded successfully.")
 except Exception as e:
-    print(f"CRITICAL ERROR: Could not load model files.")
-    print(f"Details: {e}")
+    print(f"CRITICAL ERROR: Could not load files. Details: {e}")
     model = None
     anomaly_threshold = None
 
-WINDOW_SIZE = 50
-
-# --- NEW: Define the description with Markdown for aesthetics ---
 description = """
 <div align="center">
-  <img src="https://images.pexels.com/photos/15737317/pexels-photo-15737317.jpeg" />
+  <img src="https://images.pexels.com/photos/6510296/pexels-photo-6510296.jpeg" width="600px" />
 </div>
-
-**Zodiac 1.0: Your Engine's Early-Warning System.**
-
-This MVP uses a trained AI model to analyze engine vibration data. It predicts potential mechanical failures by detecting subtle anomalies that are invisible to the human eye. 
-Paste your sensor data below to see a real-time health check.
+**Zodiac 1.0: Regression-Based Engine Diagnostics.**
+This advanced model predicts the **normal** vibration for your engine based on its current operating conditions. Enter the conditions and the actual vibration reading from your sensor to check for anomalies.
 """
 
-def predict_anomaly(data_string):
+def predict_anomaly(rpm, temp, fuel, sea_state, actual_vibration):
+    """Predicts if the actual vibration is an anomaly given the conditions."""
     if model is None:
-        return "Error: Model not loaded. Please check the terminal for details.", ""
+        return "Error: Model not loaded.", "", ""
 
     try:
-        df = pd.read_csv(io.StringIO(data_string), header=None, names=['ax','ay','az','gx','gy','gz','temperature_c'])
-        if len(df) < WINDOW_SIZE + 1:
-            return f"Not enough data. Please provide at least {WINDOW_SIZE + 1} rows.", ""
+        # Map sea state string to integer
+        sea_state_map = {"Calm": 0, "Choppy": 1, "Stormy": 2}
+        sea_state_int = sea_state_map.get(sea_state, 0)
         
-        az_data = df[['az']].values
-        scaler = StandardScaler()
-        scaled_data = scaler.fit_transform(az_data)
-
-        def create_windows(data, window_size):
-            X, y = [], []
-            for i in range(len(data) - window_size):
-                X.append(data[i:(i + window_size)])
-                y.append(data[i + window_size])
-            return np.array(X), np.array(y)
-
-        X_new, y_new = create_windows(scaled_data, WINDOW_SIZE)
-        if len(X_new) == 0:
-            return "Not enough data to form a full window.", ""
-
-        predictions = model.predict(X_new)
-        mae_loss = np.mean(np.abs(predictions - y_new), axis=1)
-        last_loss = mae_loss[-1]
+        # Create a DataFrame with the exact feature names the model was trained on
+        input_data = pd.DataFrame([{
+            'rpm': rpm,
+            'ambient_temp_c': temp,
+            'fuel_level_percent': fuel,
+            'sea_state': sea_state_int
+        }])
         
-        status = "🚨 ANOMALY DETECTED 🚨" if last_loss > anomaly_threshold else "✅ Machine State: Normal"
-        details = f"Calculated Error: {last_loss:.4f}\nAnomaly Threshold: {anomaly_threshold:.4f}"
+        # Predict the expected normal vibration
+        predicted_vibration = model.predict(input_data)[0]
+        
+        # Calculate the error
+        error = abs(actual_vibration - predicted_vibration)
+        
+        status = "🚨 ANOMALY DETECTED 🚨" if error > anomaly_threshold else "✅ Machine State: Normal"
+        
+        details = f"Predicted Normal Vibration: {predicted_vibration:.2f}\n"
+        details += f"Actual Measured Vibration: {actual_vibration:.2f}\n"
+        details += f"Calculated Error: {error:.4f}\n"
+        details += f"Anomaly Threshold: {anomaly_threshold:.4f}"
+        
         return status, details
     except Exception as e:
-        return f"An error occurred during prediction: {e}", ""
+        return f"An error occurred: {e}", ""
 
-# --- NEW: Update the Interface with the new title and description ---
+# --- Create the Gradio Interface with sliders and dropdowns for conditions ---
 demo = gr.Interface(
     fn=predict_anomaly,
-    inputs=gr.Textbox(lines=10, label=f"Paste Sensor Data (CSV format, at least {WINDOW_SIZE+1} rows)"),
-    outputs=[gr.Textbox(label="Prediction Status"), gr.Textbox(label="Details")],
-    title="Zodiac 1.0 Boat Engine Monitoring",
+    inputs=[
+        gr.Slider(800, 5000, value=2500, label="Engine RPM"),
+        gr.Slider(25, 40, value=32, label="Ambient Temperature (°C)"),
+        gr.Slider(0, 100, value=75, label="Fuel Level (%)"),
+        gr.Dropdown(["Calm", "Choppy", "Stormy"], value="Calm", label="Current Sea State"),
+        gr.Number(label="Actual Measured Vibration (from your sensor)")
+    ],
+    outputs=[
+        gr.Textbox(label="Prediction Status"),
+        gr.Textbox(label="Analysis Details")
+    ],
+    title="Zodiac 1.0 Advanced Engine Diagnostics",
     description=description,
-    theme=gr.themes.Soft() # Added a theme for better aesthetics
+    theme=gr.themes.Soft()
 )
 
 if __name__ == "__main__":

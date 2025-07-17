@@ -1,92 +1,68 @@
-# --- train_model.py ---
+# --- train_model.py (Regression Version) ---
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import os
-from sklearn.preprocessing import StandardScaler
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
-
-def create_windows(data, window_size):
-    """Helper function to create windowed data for time-series forecasting."""
-    X, y = [], []
-    for i in range(len(data) - window_size):
-        X.append(data[i:(i + window_size)])
-        y.append(data[i + window_size])
-    return np.array(X), np.array(y)
+import xgboost as xgb
+from sklearn.model_selection import train_test_split
 
 def main():
-    """Main function to run the EDA, preprocessing, and training pipeline."""
-    # --- 1. Load and Explore Data ---
-    print("--- Starting EDA and Cleaning ---")
+    """Trains an XGBoost model to predict normal vibration."""
+    print("--- Starting Regression Model Training ---")
     
     data_path = os.path.join('data', 'raw_data.csv')
-
     if not os.path.exists(data_path):
-        print(f"Error: {data_path} not found. Please generate it first by running generate_practice_data.py")
+        print(f"Error: {data_path} not found. Please run generate_data.py")
         return
 
     df = pd.read_csv(data_path)
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
-    df.set_index('timestamp', inplace=True)
+    df.dropna(inplace=True)
 
-    print("Data Info:")
-    df.info()
+    # --- Feature & Target Definition ---
+    # The model will learn to predict the 'actual' vibration based on the conditions
+    features = ['rpm', 'ambient_temp_c', 'fuel_level_percent', 'sea_state']
+    target = 'az_vibration_actual'
 
-    # Save EDA plot to a file instead of showing it interactively
-    print("\nPlotting raw sensor data...")
-    df.plot(subplots=True, figsize=(15, 12), title="Sensor Data Over Time")
-    plt.savefig('eda_raw_plots.png')
-    plt.close() # Close the plot to prevent it from displaying in some environments
-    print("Saved raw data plots to eda_raw_plots.png")
+    X = df[features]
+    y = df[target]
 
-    # --- 2. Preprocessing ---
-    df.fillna(method='ffill', inplace=True)
-    df_smooth = df.rolling(window=5).mean().dropna()
-    print("\nData cleaned and smoothed.")
+    # --- Model Training ---
+    # We will train on the 'healthy' portion of the data (first 60%)
+    # This teaches the model what "normal" looks like before the fault gets bad
+    healthy_cutoff = int(len(df) * 0.6)
+    X_train = X.iloc[:healthy_cutoff]
+    y_train = y.iloc[:healthy_cutoff]
 
-    # --- 3. Model Training ---
-    print("\n--- Training Time-Series Anomaly Detection Model ---")
+    # Initialize and train the XGBoost Regressor
+    model = xgb.XGBRegressor(
+        objective='reg:squarederror',
+        n_estimators=1000,
+        learning_rate=0.05,
+        max_depth=5,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        random_state=42,
+        n_jobs=-1 # Use all available CPU cores
+    )
     
-    healthy_cutoff = int(len(df_smooth) * 0.6)
-    df_healthy = df_smooth.iloc[:healthy_cutoff]
-
-    scaler = StandardScaler()
-    scaled_data = scaler.fit_transform(df_healthy[['az']])
-
-    WINDOW_SIZE = 50
-    X_train, y_train = create_windows(scaled_data, WINDOW_SIZE)
-
-    # Build the LSTM model
-    model = Sequential([
-        LSTM(64, input_shape=(X_train.shape[1], X_train.shape[2]), return_sequences=True),
-        Dropout(0.2),
-        LSTM(32, return_sequences=False),
-        Dropout(0.2),
-        Dense(1)
-    ])
-    model.compile(optimizer='adam', loss='mse')
-    print("\nModel Summary:")
-    model.summary()
-
     print("\nStarting model training...")
-    model.fit(X_train, y_train, epochs=20, batch_size=32, validation_split=0.1, verbose=1)
+    model.fit(X_train, y_train, verbose=False)
     
-    # --- 4. Save Model and Threshold ---
-    os.makedirs('models', exist_ok=True)
-    # FIX: Save in the recommended .keras format
-    model.save('models/time_series_model.keras') 
+    # --- Save Model and Calculate Anomaly Threshold ---
+    model_dir = 'models'
+    os.makedirs(model_dir, exist_ok=True)
+    model.save_model(os.path.join(model_dir, 'vibration_regressor.json'))
+    print(f"\nModel saved to: {model_dir}/vibration_regressor.json")
 
-    # Calculate anomaly threshold on the same healthy data
-    train_pred = model.predict(X_train)
-    train_mae_loss = np.mean(np.abs(train_pred - y_train), axis=1)
-    anomaly_threshold = np.max(train_mae_loss) * 1.5 
-    np.save('models/anomaly_threshold.npy', anomaly_threshold)
+    # The key step: Use the trained model to predict what the vibration *should* have been
+    # for the healthy data, then find the error.
+    y_pred_healthy = model.predict(X_train)
+    errors = np.abs(y_train - y_pred_healthy)
     
-    print(f"\nTraining complete.")
-    print(f"Model saved to: models/time_series_model.keras")
-    print(f"Anomaly threshold ({anomaly_threshold:.4f}) saved to: models/anomaly_threshold.npy")
+    # The anomaly threshold is a level of error that is unusual for a healthy machine
+    anomaly_threshold = np.percentile(errors, 99) * 1.5 # 99th percentile, with a buffer
+    
+    np.save(os.path.join(model_dir, 'regression_anomaly_threshold.npy'), anomaly_threshold)
+    print(f"Anomaly threshold ({anomaly_threshold:.4f}) saved to: {model_dir}/regression_anomaly_threshold.npy")
 
 if __name__ == "__main__":
     main()
