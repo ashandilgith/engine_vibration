@@ -1,5 +1,6 @@
-title: Zodiac 1.0 Engine Monitor
-emoji: 🛥️
+---
+title: Zodiac 1.0 Engine Diagnostics
+emoji: 🛠️
 colorFrom: blue
 colorTo: green
 sdk: gradio
@@ -8,12 +9,13 @@ app_file: app.py
 pinned: false
 ---
 
-# Zodiac 1.0: Predictive Engine Monitoring
+# Zodiac 1.0: Predictive Engine Diagnostics
 
-This is an MVP of a predictive maintenance system for marine and automotive engines. It uses an AI model to analyze vibration data and detect the early signs of mechanical failure.
+This is an MVP of a predictive maintenance system for engines. It uses a regression-based AI model (XGBoost) to predict the normal vibration of an engine based on its current operating conditions.
 
 ## How to Use This Demo
 
-1.  **Get Sample Data:** You can copy the sample data from the `data/raw_data.csv` file in the repository. You will need at least 51 rows.
-2.  **Paste Data:** Paste the copied CSV data into the input box.
-3.  **Get Prediction:** The model will analyze the last sequence of data and determine if it represents a "Normal" or "Anomalous" engine state.
+1.  **Set Operating Conditions:** Use the sliders and dropdowns for input the engine's current RPM, the ambient temperature, fuel level, and sea state.
+2.  **Enter Actual Vibration:** In the final box, enter the vibration reading you would get from a real-world sensor.
+3.  **Get Prediction:** The model will compare the predicted "normal" vibration to the actual value and determine if it's an anomaly.
+
