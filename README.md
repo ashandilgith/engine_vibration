@@ -1,5 +1,5 @@
 ---
-title: Zodiac 1.0 Engine Diagnostics
+title: PiranaWare Engine Diagnostics
 emoji: 🛠️
 colorFrom: blue
 colorTo: green
@@ -9,7 +9,7 @@ app_file: app.py
 pinned: false
 ---
 
-# Zodiac 1.0: Predictive Engine Diagnostics
+# PiranaWare: Predictive Engine Diagnostics
 
 This is an MVP of a predictive maintenance system for engines. It uses a regression-based AI model (XGBoost) to predict the normal vibration of an engine based on its current operating conditions.
 
