@@ -77,7 +77,7 @@ demo = gr.Interface(
         gr.Textbox(label="Prediction Status"),
         gr.Textbox(label="Analysis Details")
     ],
-    title="Zodiac 1.0 Advanced Engine Diagnostics",
+    title="PiranaWare Boat Engine Predictive Maintenance",
     description=description,
     theme=gr.themes.Soft()
 )
